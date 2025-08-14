@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import os
 
 # ----------------------------
 # Helper Functions
@@ -25,17 +27,23 @@ def calculate_angle(a, b, c):
     return np.degrees(angle)
 
 # ----------------------------
+# Ensure folders exist
+# ----------------------------
+os.makedirs("Data/Bahaar", exist_ok=True)
+os.makedirs("Graphs", exist_ok=True)
+
+# ----------------------------
 # Video Processing
 # ----------------------------
-cap = cv2.VideoCapture("Silent Speech/Words/Bukhar/bukhar_anvut.mp4")
+cap = cv2.VideoCapture(0)
 fps = cap.get(cv2.CAP_PROP_FPS)
 if fps == 0:
-    raise ValueError("FPS is zero. Check video file.")
+    raise ValueError("FPS is zero. Check camera/video file.")
 frame_duration = 1 / fps
 
-results = []  # Store results for all frames
-
+results = []
 frame_idx = 0
+
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
@@ -44,9 +52,8 @@ while cap.isOpened():
     frame_idx += 1
     time_stamp = frame_idx * frame_duration
 
-    # Resize for consistent processing
+    # Resize
     resized = cv2.resize(frame, (1250, 700), interpolation=cv2.INTER_LINEAR)
-
     hsv = cv2.cvtColor(resized, cv2.COLOR_BGR2HSV)
 
     # Blue markers
@@ -58,75 +65,117 @@ while cap.isOpened():
     green_points = get_centers(green_mask, min_area=100)
 
     if len(blue_points) >= 2 and len(green_points) >= 1:
-        # Sort blue points by Y position (top = forehead, bottom = chin)
         blue_points_sorted = sorted(blue_points, key=lambda p: p[1])
         forehead_pos = blue_points_sorted[0]
         chin_pos = blue_points_sorted[-1]
-        green_pos = green_points[0]  # Assuming only one green marker
+        green_pos = green_points[0]
 
-        # Calculate angle
         angle = calculate_angle(forehead_pos, green_pos, chin_pos)
+        vertical_disp = chin_pos[1] - forehead_pos[1]   # Δy
+        horizontal_disp = chin_pos[0] - forehead_pos[0]   # Δx
 
-        # Draw markers
-        cv2.circle(resized, forehead_pos, 5, (255, 0, 0), -1)  # Blue
-        cv2.circle(resized, chin_pos, 5, (255, 0, 0), -1)      # Blue
-        cv2.circle(resized, green_pos, 5, (0, 255, 0), -1)     # Green
-
-        # Draw lines
+        # Draw
+        cv2.circle(resized, forehead_pos, 5, (255, 0, 0), -1)
+        cv2.circle(resized, chin_pos, 5, (255, 0, 0), -1)
+        cv2.circle(resized, green_pos, 5, (0, 255, 0), -1)
         cv2.line(resized, forehead_pos, green_pos, (0, 0, 0), 2)
         cv2.line(resized, green_pos, chin_pos, (0, 0, 0), 2)
+        cv2.putText(resized, f"Theta: {angle:.2f} | t: {time_stamp:.2f}s | Δy: {vertical_disp} | Δx: {horizontal_disp}",
+                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
-        # Display angle
-        cv2.putText(resized, f" Theta: {angle:.2f} and t: {time_stamp:.2f}s", (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-
-        angle = calculate_angle(forehead_pos, green_pos, chin_pos)
         results.append({"frame_idx": frame_idx, "t": time_stamp, "theta": angle})
 
     else:
         results.append({"frame_idx": frame_idx, "t": time_stamp, "theta": np.nan})
         cv2.putText(resized, "Markers missing", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-        
+
     cv2.imshow("Jaw Tracking", resized)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
 cap.release()
-cv2.destroyAllWindows() 
+cv2.destroyAllWindows()
 
-# Create DataFrame & save
+# ----------------------------
+# Data Processing
+# ----------------------------
 df = pd.DataFrame(results)
-df.to_csv("jaw_angle_dataset.csv", index=False)
-# Define phase ranges
-phases = {
-    "Reference": (0, 512),
-    "Max_Open": (513, 771),
-    "Speech": (772, df["frame_idx"].max())
-}
 
-# Calculate velocity using central difference method
+# Velocity
 ang_vel = []
 theta = df["theta"].values
-for i in range(1, len(df)-1):
-    vel = (theta[i+1] - theta[i-1]) / (2 * frame_duration)
+for i in range(1, len(df) - 1):
+    vel = (theta[i + 1] - theta[i - 1]) / (2 * frame_duration)
     ang_vel.append(vel)
-
 df["omega"] = [0] + ang_vel + [0]
 
-# Calculate mean for each phase
+# Acceleration
+ang_acc = []
+for i in range(1, len(df) - 1):
+    acc = (theta[i + 1] - 2 * theta[i] + theta[i - 1]) / (frame_duration ** 2)
+    ang_acc.append(acc)
+df["alpha"] = [0] + ang_acc + [0]
+
+# ----------------------------
+# Phase Means Example
+# ----------------------------
+phases = {
+    "Reference": (0, 150),
+    "Max_Open": (151, 300),
+}
 phase_means = {}
 for phase, (start, end) in phases.items():
     mean_angle = df.loc[(df["frame_idx"] >= start) & (df["frame_idx"] <= end), "theta"].mean()
     mean_velocity = df.loc[(df["frame_idx"] >= start) & (df["frame_idx"] <= end), "omega"].mean()
-    phase_means[phase] = {"Mean_Angle": mean_angle, "Mean_Velocity": mean_velocity}
+    mean_acceleration = df.loc[(df["frame_idx"] >= start) & (df["frame_idx"] <= end), "alpha"].mean()
+    phase_means[phase] = {
+        "Mean_Angle": mean_angle,
+        "Mean_Velocity": mean_velocity,
+        "Mean_Acceleration": mean_acceleration
+    }
 
-# Save results
-df.to_csv("jaw_angle_dataset.csv", index=False)
-pd.DataFrame.from_dict(phase_means, orient="index", columns=["Mean_Angle","Mean_Velocity"]).to_csv("phase_means.csv")
+# ----------------------------
+# Save Outputs
+# ----------------------------
+df.to_csv("Data/Bahaar/baharasa.csv", index=False)
+pd.DataFrame.from_dict(phase_means, orient="index").to_csv("Data/Bahaar/phase_meanssass.csv")
 
-print("Frame-by-frame dataset saved as 'jaw_angle_dataset.csv'")
-print("Phase-wise means saved as 'phase_means.csv'")
+# ----------------------------
+# Plot and Save Graph
+# ----------------------------
+plt.figure(figsize=(12, 6))
+plt.subplot(2, 1, 1)
+plt.plot(df['t'], df['theta'], label='Angle (theta)', color='b')
+plt.xlabel('Time (s)')
+plt.ylabel('Angle (degrees)')
+plt.title('Jaw Angle vs Time')
+plt.legend()
+plt.grid(True)
+
+plt.subplot(2, 1, 2)
+plt.plot(df['t'], df['omega'], label='Angular Velocity (omega)', color='r')
+plt.xlabel('Time (s)')
+plt.ylabel('Angular Velocity (deg/s)')
+plt.title('Angular Velocity vs Time')
+plt.legend()
+plt.grid(True)
+
+plt.tight_layout()
+plt.savefig('Graphs/angle_vs_time.png')
+plt.show()
+
 print("\nPhase Means:", phase_means)
-
-
+while True:
+    choice = input(f"Do you want to save the recording'? (y/n): ").strip().lower()
+    if choice == 'y':
+        print("✅ Recording saved.")
+        break
+    elif choice == 'n':
+        os.remove("Graphs/angle_vs_time.png")
+        os.remove("Data/Bahaar/baharasa.csv")
+        os.remove("Data/Bahaar/phase_meanssass.csv")
+        print("🗑️ Recording deleted.")
+        break
+    else:
+        print("Invalid input, please enter 'y' or 'n'.")
