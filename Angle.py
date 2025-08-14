@@ -80,7 +80,7 @@ while cap.isOpened():
         cv2.circle(resized, green_pos, 5, (0, 255, 0), -1)
         cv2.line(resized, forehead_pos, green_pos, (0, 0, 0), 2)
         cv2.line(resized, green_pos, chin_pos, (0, 0, 0), 2)
-        cv2.putText(resized, f"Theta: {angle:.2f} | t: {time_stamp:.2f}s | Δy: {vertical_disp} | Δx: {horizontal_disp}",
+        cv2.putText(resized, f"Theta: {angle:.2f} | t: {time_stamp:.2f}s | y: {vertical_disp} | x: {horizontal_disp}",
                     (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
         results.append({"frame_idx": frame_idx, "t": time_stamp, "theta": angle})
