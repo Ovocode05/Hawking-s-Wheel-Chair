@@ -8,6 +8,7 @@ import os
 # Helper Functions
 # ----------------------------
 def get_centers(mask, min_area=100):
+    """Find marker centers from a binary mask."""
     centers = []
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     for cnt in contours:
@@ -20,6 +21,7 @@ def get_centers(mask, min_area=100):
     return centers
 
 def calculate_angle(a, b, c):
+    """Calculate angle at point b given points a, b, c."""
     ba = np.array(a) - np.array(b)
     bc = np.array(c) - np.array(b)
     cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
@@ -29,21 +31,35 @@ def calculate_angle(a, b, c):
 # ----------------------------
 # Ensure folders exist
 # ----------------------------
-os.makedirs("Data/Bahaar", exist_ok=True)
+os.makedirs("Data/Doctor", exist_ok=True)
 os.makedirs("Graphs", exist_ok=True)
+os.makedirs("Videos", exist_ok=True)
 
 # ----------------------------
-# Video Processing
+# Video Capture Setup
 # ----------------------------
 cap = cv2.VideoCapture(0)
 fps = cap.get(cv2.CAP_PROP_FPS)
 if fps == 0:
-    raise ValueError("FPS is zero. Check camera/video file.")
+    fps = 30  # fallback in case camera FPS is not detected
 frame_duration = 1 / fps
+
+# ----------------------------
+# Ask for filename
+# ----------------------------
+filename = input("Enter a base name for saving files (without extension): ").strip()
+
+# Video writer setup (save processed video)
+fourcc = cv2.VideoWriter_fourcc(*"XVID")
+video_path = f"Videos/{filename}.avi"
+out = cv2.VideoWriter(video_path, fourcc, fps, (1250, 700))
 
 results = []
 frame_idx = 0
 
+# ----------------------------
+# Video Processing
+# ----------------------------
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
@@ -52,7 +68,7 @@ while cap.isOpened():
     frame_idx += 1
     time_stamp = frame_idx * frame_duration
 
-    # Resize
+    # Resize and convert to HSV
     resized = cv2.resize(frame, (1250, 700), interpolation=cv2.INTER_LINEAR)
     hsv = cv2.cvtColor(resized, cv2.COLOR_BGR2HSV)
 
@@ -71,16 +87,17 @@ while cap.isOpened():
         green_pos = green_points[0]
 
         angle = calculate_angle(forehead_pos, green_pos, chin_pos)
-        vertical_disp = chin_pos[1] - forehead_pos[1]   # Δy
-        horizontal_disp = chin_pos[0] - forehead_pos[0]   # Δx
+        vertical_disp = chin_pos[1] - forehead_pos[1]
+        horizontal_disp = chin_pos[0] - forehead_pos[0]
 
-        # Draw
+        # Draw markers and lines
         cv2.circle(resized, forehead_pos, 5, (255, 0, 0), -1)
         cv2.circle(resized, chin_pos, 5, (255, 0, 0), -1)
         cv2.circle(resized, green_pos, 5, (0, 255, 0), -1)
         cv2.line(resized, forehead_pos, green_pos, (0, 0, 0), 2)
         cv2.line(resized, green_pos, chin_pos, (0, 0, 0), 2)
-        cv2.putText(resized, f"Theta: {angle:.2f} | t: {time_stamp:.2f}s | y: {vertical_disp} | x: {horizontal_disp}",
+        cv2.putText(resized,
+                    f"Theta: {angle:.2f} | t: {time_stamp:.2f}s | y: {vertical_disp} | x: {horizontal_disp}",
                     (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
         results.append({"frame_idx": frame_idx, "t": time_stamp, "theta": angle})
@@ -90,11 +107,15 @@ while cap.isOpened():
         cv2.putText(resized, "Markers missing", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
+    # Show and save video frame
     cv2.imshow("Jaw Tracking", resized)
+    out.write(resized)
+
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
 cap.release()
+out.release()
 cv2.destroyAllWindows()
 
 # ----------------------------
@@ -138,14 +159,19 @@ for phase, (start, end) in phases.items():
 # ----------------------------
 # Save Outputs
 # ----------------------------
-df.to_csv("Data/Bahaar/baharasa.csv", index=False)
-pd.DataFrame.from_dict(phase_means, orient="index").to_csv("Data/Bahaar/phase_meanssass.csv")
+csv_path = f"Data/Doctor/{filename}.csv"
+phase_csv_path = f"Data/Doctor/{filename}_phase_means.csv"
+graph_path = f"Graphs/{filename}_angle_vs_time.png"
+
+df.to_csv(csv_path, index=False)
+pd.DataFrame.from_dict(phase_means, orient="index").to_csv(phase_csv_path)
 
 # ----------------------------
-# Plot and Save Graph
+# Plot and Save Combined Graphs
 # ----------------------------
-plt.figure(figsize=(12, 6))
-plt.subplot(2, 1, 1)
+plt.figure(figsize=(12, 9))
+
+plt.subplot(3, 1, 1)
 plt.plot(df['t'], df['theta'], label='Angle (theta)', color='b')
 plt.xlabel('Time (s)')
 plt.ylabel('Angle (degrees)')
@@ -153,7 +179,7 @@ plt.title('Jaw Angle vs Time')
 plt.legend()
 plt.grid(True)
 
-plt.subplot(2, 1, 2)
+plt.subplot(3, 1, 2)
 plt.plot(df['t'], df['omega'], label='Angular Velocity (omega)', color='r')
 plt.xlabel('Time (s)')
 plt.ylabel('Angular Velocity (deg/s)')
@@ -161,21 +187,34 @@ plt.title('Angular Velocity vs Time')
 plt.legend()
 plt.grid(True)
 
+plt.subplot(3, 1, 3)
+plt.plot(df['t'], df['alpha'], label='Angular Acceleration (alpha)', color='g')
+plt.xlabel('Time (s)')
+plt.ylabel('Angular Acceleration (deg/s²)')
+plt.title('Angular Acceleration vs Time')
+plt.legend()
+plt.grid(True)
+
 plt.tight_layout()
-plt.savefig('Graphs/angle_vs_time.png')
+plt.savefig(graph_path)
 plt.show()
 
 print("\nPhase Means:", phase_means)
+
+# ----------------------------
+# User Confirmation
+# ----------------------------
 while True:
-    choice = input(f"Do you want to save the recording'? (y/n): ").strip().lower()
+    choice = input(f"Do you want to keep the recording '{filename}'? (y/n): ").strip().lower()
     if choice == 'y':
-        print("✅ Recording saved.")
+        print(f"✅ Files saved as:\n  {csv_path}\n  {phase_csv_path}\n  {graph_path}\n  {video_path}")
         break
     elif choice == 'n':
-        os.remove("Graphs/angle_vs_time.png")
-        os.remove("Data/Bahaar/baharasa.csv")
-        os.remove("Data/Bahaar/phase_meanssass.csv")
-        print("🗑️ Recording deleted.")
+        os.remove(graph_path)
+        os.remove(csv_path)
+        os.remove(phase_csv_path)
+        os.remove(video_path)
+        print("🗑️ All files deleted.")
         break
     else:
         print("Invalid input, please enter 'y' or 'n'.")
