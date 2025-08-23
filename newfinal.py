@@ -29,11 +29,17 @@ def calculate_angle(a, b, c):
     return np.degrees(angle)
 
 # ----------------------------
+# Ask for filename
+# ----------------------------
+filename = input("Enter a base name for saving files (without extension): ").strip()
+word = input("Enter a word to include in the filenames: ").strip()
+# ----------------------------
+
 # Ensure folders exist
 # ----------------------------
-os.makedirs("Data/Doctor", exist_ok=True)
-os.makedirs("Graphs", exist_ok=True)
-os.makedirs("Videos", exist_ok=True)
+os.makedirs(f"Data/{word}", exist_ok=True)
+os.makedirs(f"Graphs/{word}", exist_ok=True)
+os.makedirs(f"Videos/{word}", exist_ok=True)
 
 # ----------------------------
 # Video Capture Setup
@@ -44,10 +50,6 @@ if fps == 0:
     fps = 30  # fallback in case camera FPS is not detected
 frame_duration = 1 / fps
 
-# ----------------------------
-# Ask for filename
-# ----------------------------
-filename = input("Enter a base name for saving files (without extension): ").strip()
 
 # Video writer setup (save processed video)
 fourcc = cv2.VideoWriter_fourcc(*"XVID")
@@ -100,10 +102,10 @@ while cap.isOpened():
                     f"Theta: {angle:.2f} | t: {time_stamp:.2f}s | y: {vertical_disp} | x: {horizontal_disp}",
                     (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
-        results.append({"frame_idx": frame_idx, "t": time_stamp, "theta": angle})
+        results.append({"frame_idx": frame_idx, "t": time_stamp, "theta": angle, "x": horizontal_disp, "y": vertical_disp})
 
     else:
-        results.append({"frame_idx": frame_idx, "t": time_stamp, "theta": np.nan})
+        results.append({"frame_idx": frame_idx, "t": time_stamp, "theta": np.nan, "x": np.nan, "y": np.nan})
         cv2.putText(resized, "Markers missing", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
@@ -159,9 +161,9 @@ for phase, (start, end) in phases.items():
 # ----------------------------
 # Save Outputs
 # ----------------------------
-csv_path = f"Data/Doctor/{filename}.csv"
-phase_csv_path = f"Data/Doctor/{filename}_phase_means.csv"
-graph_path = f"Graphs/{filename}_angle_vs_time.png"
+csv_path = f"Data/{word}/{filename}.csv"
+phase_csv_path = f"Data/{word}/{filename}_phase_means.csv"
+graph_path = f"Graphs/{word}/{filename}_angle_vs_time.png"
 
 df.to_csv(csv_path, index=False)
 pd.DataFrame.from_dict(phase_means, orient="index").to_csv(phase_csv_path)
