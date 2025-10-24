@@ -53,7 +53,7 @@ frame_duration = 1 / fps
 
 # Video writer setup (save processed video)
 fourcc = cv2.VideoWriter_fourcc(*"XVID")
-video_path = f"Videos/{filename}.avi"
+video_path = f"Videos/{word}/{filename}_{word}.avi"
 out = cv2.VideoWriter(video_path, fourcc, fps, (1250, 700))
 
 results = []
@@ -216,7 +216,7 @@ while True:
         os.remove(csv_path)
         os.remove(phase_csv_path)
         os.remove(video_path)
-        print("🗑️ All files deleted.")
+        print("🗑 All files deleted.")
         break
     else:
         print("Invalid input, please enter 'y' or 'n'.")
