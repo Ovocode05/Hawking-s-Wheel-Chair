@@ -2,3 +2,4 @@ Data
 Data/*.log
 Data/*.tmp
 /Data/
+/results/
