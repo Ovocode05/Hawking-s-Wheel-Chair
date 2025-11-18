@@ -2,13 +2,13 @@ import os
 import matplotlib.pyplot as plt
 
 # Import all our custom modules from the 'src' folder
-from eda_src.data_loader import gather_motion_summaries
-from eda_src.analysis import (
+from eda.data_loader import gather_motion_summaries
+from eda.analysis import (
     intersubject_variability_table, 
     word_separability_metrics,
     compute_word_similarity_for_subject
 )
-from eda_src.visualization import (
+from eda.visualization import (
     plot_intersubject_variability, 
     plot_word_separability,
     plot_within_subject_similarity
