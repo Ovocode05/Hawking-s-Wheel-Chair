@@ -1,119 +1,162 @@
-# Rough EDA / Pipeline summary
+# Jaw-Motion Pipeline — Concise Technical Summary
 
-This is a concise summary of the exploratory data analysis and preprocessing work done so far on the jaw-motion recordings. It outlines the pipeline, the extracted features, analysis performed, key outputs, and suggested next steps.
+This document summarizes the complete pipeline, analyses, outputs, and next steps for the jaw-motion recordings project.
 
-## Project layout (relevant files)
+---
 
-- eda_src/feature_extraction.py — cleaning, segmentation, feature extraction (per measurement summary: mean/std).
-- eda_src/data_loader.py — gather per-word / per-subject summaries from CSVs.
-- eda_src/analysis.py — intersubject variability and word separability metrics (Fisher score, Mahalanobis).
-- eda_src/visualization.py — plotting helpers (heatmaps, barplots, similarity matrices).
-- Preprocessing/main.py — automated pipeline + plotting test harness.
-- Data/recordings/... — CSV recordings organized by word/subject.
-- Graphs/ — output plots saved here by scripts.
+## 1. EDA directory structure
 
-## Processing pipeline (automated)
+**Core code**
+- `feature_extraction.py` — cleaning, segmentation, feature extraction (per-segment → per-recording mean/std)
+- `data_loader.py` — aggregate per-word / per-subject summaries from CSVs
+- `analysis.py` — intersubject variability, Fisher score, Mahalanobis distance
+- `visualization.py` — heatmaps, barplots, similarity matrices
+- `main.py` — automated pipeline runner and plotting harness
 
-1. Read CSV for a single recording (or accept DataFrame).
-2. Trim to first N rows (default 1800); warn if fewer available.
-3. Remove bad initial rows: within the first 100 rows drop rows where `theta` is NaN or zero.
-4. Take absolute values of numeric columns (to make directionless metrics).
-5. Split remaining rows into 12 parts:
-   - reference_1 (part 1) → treated as "minimum" reference
-   - reference_2 (part 2) → treated as "maximum" reference
-   - measurement_1 .. measurement_10 (parts 3..12) → motion segments (jaw range of motion)
-6. Automated preprocessing pipeline (one-call):
-   - detect small NaN gaps and fill only short gaps (limit in samples)
-   - smooth series (Savitzky–Golay / median / rolling)
-   - detect outliers using robust MAD-based thresholding and replace them by smoothed values
-   - return cleaned DataFrame + boolean masks: filled / outlier / changed, plus a summary counts per column
+**Data / outputs**
+- `Data/recordings/{word}/{subject}.csv` — raw recordings
+- `Graphs/` — plots (raw vs cleaned, correlations, heatmaps, etc.)
+- `results/` — tabular outputs from analyses
+- `Graphs/` also contains raw CV tracking plots from computer vision
 
-## Extracted motion features (per recording)
+---
 
-For the 10 measurement segments we extract per-segment metrics and then summarize across segments (subject/word-level):
+## 2. Automated preprocessing pipeline
 
-- num_peaks (theta) — number of local maxima (peak count)
-- range_theta — max(theta) − min(theta) in a segment
-- x_range, y_range — spatial ranges for x and y
-- x_disp, y_disp — displacement (last − first) in x and y
+For each CSV (or DataFrame):
 
-Aggregation currently uses mean and standard deviation across the 10 measurements for each recording/subject/word.
+1. Read recording.
+2. Trim to first `N=1800` rows (warn if fewer).
+3. In first 100 rows: drop rows where `theta` is NaN or zero.
+4. Take absolute value of numeric columns.
+5. Split into 12 parts:
+   - `reference_1` (part 1) → minimum reference  
+   - `reference_2` (part 2) → maximum reference  
+   - `measurement_1` … `measurement_10` (parts 3–12) → motion segments
+6. Automated preprocessing:
+   - Fill short NaN gaps only (sample-limited).
+   - Smooth (Savitzky–Golay / median / rolling).
+   - Detect outliers using robust MAD thresholds.
+   - Replace outliers with smoothed values.
+   - Return cleaned data + boolean masks (`filled`, `outlier`, `changed`) and per-column counts.
 
-## Cross-subject / cross-word analysis
+---
 
-Two main analyses implemented:
+## 3. Extracted motion features (per segment → summarized)
 
-1. Intersubject variability
+For each of the 10 measurement segments:
 
-   - For each word and each metric we compute:
-     - mean of subject-means
-     - std of subject-means
-     - coefficient of variation (cv = std / mean)
-   - Output: DataFrame (words × metrics) with mean / std / cv; visualized as a CV heatmap.
-   - Interpretation: Higher CV → more variability across subjects for the same word.
+- `num_peaks` (theta)
+- `range_theta = max(theta) − min(theta)`
+- `x_range`, `y_range`
+- `x_disp = last(x) − first(x)`
+- `y_disp = last(y) − first(y)`
 
-2. Word separability (inter-word distinction)
+Per recording / subject / word: **mean and standard deviation** of each metric across the 10 segments.
 
-   - Per-metric Fisher score: ratio of between-word variance to within-word variance (higher → better feature)
-   - Multivariate pairwise Mahalanobis distance between word centroids (uses pooled within-class covariance)
-   - Outputs:
-     - fisher_df: Fisher score per metric
-     - pairwise_mahalanobis: word × word distance matrix
-     - centroids: word × metric mean vector
-   - Interpretation: Higher Fisher and larger Mahalanobis distance indicate features/words that are easier to distinguish.
+---
 
-3. Within-subject word similarity
-   - For one chosen subject, build per-word feature vectors and compute pairwise distances and similarity (1/(1+dist)).
-   - Output: distance and similarity matrices (heatmaps). Lower distance / higher similarity means two words are produced similarly by that subject.
+## 4. Analyses implemented
 
-## Visualization / saved outputs
+### 4.1 Intersubject variability (within a word)
 
-- Intersubject CV heatmap (saved to Graphs/)
-- Fisher score barplot and Mahalanobis heatmap (saved to Graphs/)
-- Within-subject similarity heatmap for a chosen subject (saved to Graphs/)
-- Raw vs cleaned series comparison and cleaned correlation plots (saved to Graphs/)
+For each word × metric:
+- mean of subject means
+- std of subject means
+- coefficient of variation `cv = std / mean`
 
-Example saved filenames (created by test harness):
+Output: DataFrame (words × metrics) and CV heatmap.  
+Interpretation: higher CV → higher subject-to-subject variability.
 
-- Graphs/Amish_refined_comparison.png
-- Graphs/Amish_refined_correlation.png
-- Graphs/word_separability_fisher_score.png
-- Graphs/word_separability_distance_matrix.png
+---
 
-## Quick run examples
+### 4.2 Word separability
 
-- Gather summaries for words and subjects:
-  - from eda_src.data_loader import gather_motion_summaries
-  - summaries, errors = gather_motion_summaries(words, names, base_path="Data/recordings")
-- Produce full reports and plots:
+- **Per-metric Fisher score** = between-word variance / within-word variance.
+- **Pairwise Mahalanobis distance** between word centroids (using pooled within-class covariance).
 
-  - from eda_src.analysis import compute_word_similarity_for_subject, intersubject_variability_table, word_separability_metrics
-  - from eda_src.visualization import plot_intersubject_variability, plot_word_separability, plot_within_subject_similarity
-  - results = produce_reports(words, names, base_path="Data/recordings", subject_for_word_similarity="Bansbir")
+Outputs:
+- `fisher_df` (metric importance)
+- `pairwise_mahalanobis` (word × word distance matrix)
+- `centroids` (word × metric mean vectors)
 
-- Run the preprocessing + plotting test (example path expected in code):
-  - python Preprocessing/main.py
-  - (This runs automated_preprocess on the example CSV and saves comparison plots in Graphs/)
+Interpretation: higher Fisher or Mahalanobis → better separability; small distances indicate confusable words.
 
-## Short summary of results (rough / qualitative)
+---
 
-- Preprocessing: pipeline successfully fills short gaps and replaces severe outliers using smoothing + robust MAD; boolean masks track changes.
-- Intersubject variability: some metrics show high CV across subjects (indicates inconsistent articulation / sensor placement). Focus on low-CV features for robust word models.
-- Feature importance: Fisher scores highlight which metrics (e.g., range_theta vs x_disp) separate words best. Use highest Fisher features for simple classification experiments.
-- Multivariate separation: Mahalanobis distances between word centroids give a compact measure of pairwise distinctiveness. Pairs with small distances are likely to be confusable.
+### 4.3 Within-subject word similarity
 
-## Limitations and next steps
+For a selected subject:
+- Build per-word feature vectors.
+- Compute pairwise distances and similarity `1 / (1 + dist)`.
 
-- Time-aware modeling: current resampling/handling is simplistic; consider Kalman / state-space models for interpolation across longer gaps.
-- Imputation traceability: masks exist but many downstream steps currently ignore whether values were imputed — preserve masks through pipeline and consider filtering features derived from large-imputed regions.
-- Feature set: expand to frequency/time-frequency features or dynamic features (velocity/acceleration) if sensor sampling supports it.
-- Validation: run simple classifiers (e.g., LDA / logistic / random forest) using top Fisher features to quantify word separability statistically.
-- Visualization: add per-word overlay plots of centroids ± covariance ellipses for 2D projections (PCA).
+Outputs: distance and similarity matrices (heatmaps).  
+Interpretation: lower distance / higher similarity → similar articulation for that subject.
 
-## Contact / notes
+---
 
-- Scripts expect recordings at `Data/recordings/{word}/{subject}.csv`.
-- Plots and intermediate outputs are written to `Graphs/` by default.
-- For repeatability, ensure SciPy is installed (savitzky-golay, peak finding); code has fallbacks when SciPy is missing.
+## 5. Visual outputs
 
-# End of rough EDA summary
+Saved in `Graphs/`:
+- Raw vs cleaned time-series comparisons
+- Cleaned correlation plots
+- Intersubject CV heatmap
+- Fisher score barplot
+- Mahalanobis distance heatmap
+- Within-subject similarity heatmap
+
+Example filenames:
+- `Graphs/Amish_refined_comparison.png`
+- `Graphs/Amish_refined_correlation.png`
+- `Graphs/word_separability_fisher_score.png`
+- `Graphs/word_separability_distance_matrix.png`
+
+---
+
+## 6. Example usage
+
+**Gather summaries**
+```python
+from eda_src.data_loader import gather_motion_summaries
+summaries, errors = gather_motion_summaries(words, names, base_path="Data/recordings")
+```
+
+**Run analyses**
+```python
+from eda_src.analysis import compute_word_similarity_for_subject, intersubject_variability_table, word_separability_metrics
+from eda_src.visualization import plot_intersubject_variability, plot_word_separability, plot_within_subject_similarity
+
+results = produce_reports(words, names, base_path="Data/recordings", subject_for_word_similarity="Bansbir")
+```
+
+**Run preprocessing test**
+```bash
+python Preprocessing/main.py
+```
+
+---
+
+## 7. Key findings (qualitative)
+
+- Preprocessing robustly fills short gaps and suppresses outliers while tracking all modifications.
+- Some metrics show high intersubject CV → likely sensitive to articulation or sensor placement.
+- Fisher scores identify the most discriminative features (e.g., `range_theta` vs `x_disp`).
+- Small Mahalanobis distances flag potentially confusable word pairs.
+
+---
+
+## 8. Limitations & next steps
+
+- Use time-aware interpolation (Kalman / state-space) for longer gaps.
+- Propagate imputation masks into downstream analysis and down-weight heavily imputed segments.
+- Expand feature set (velocity, acceleration, frequency/time-frequency).
+- Quantify separability via classifiers (LDA, logistic regression, random forest) using top Fisher features.
+- Add PCA projections with centroid ± covariance ellipses.
+
+---
+
+## 9. Notes
+
+- Expected data layout: `Data/recordings/{word}/{subject}.csv`
+- Outputs default to `Graphs/` and `results/`.
+- SciPy required for Savitzky–Golay and peak detection (fallbacks exist).
