@@ -1,162 +1,160 @@
-# Jaw-Motion Pipeline — Concise Technical Summary
+# Silent Speech Recognition - Jaw Kinematics Analysis
 
-This document summarizes the complete pipeline, analyses, outputs, and next steps for the jaw-motion recordings project.
+A project for silent speech recognition using jaw kinematics and motion data, focusing on medical and health-related vocabulary in Punjabi/Hindi.
 
----
+## 📋 Overview
 
-## 1. EDA directory structure
+This project implements a silent speech recognition system that analyzes jaw movements to recognize spoken words without audible speech. The system processes kinematic data (theta, x, y, omega, alpha) from jaw movements and uses signal processing techniques to segment and classify words.
 
-**Core code**
-- `feature_extraction.py` — cleaning, segmentation, feature extraction (per-segment → per-recording mean/std)
-- `data_loader.py` — aggregate per-word / per-subject summaries from CSVs
-- `analysis.py` — intersubject variability, Fisher score, Mahalanobis distance
-- `visualization.py` — heatmaps, barplots, similarity matrices
-- `main.py` — automated pipeline runner and plotting harness
+## 🎯 Project Purpose
 
-**Data / outputs**
-- `Data/recordings/{word}/{subject}.csv` — raw recordings
-- `Graphs/` — plots (raw vs cleaned, correlations, heatmaps, etc.)
-- `results/` — tabular outputs from analyses
-- `Graphs/` also contains raw CV tracking plots from computer vision
+The project aims to develop assistive communication technology for individuals who cannot speak audibly, similar to Stephen Hawking's communication system. It focuses on recognizing 25 common medical and health-related terms in Punjabi/Hindi.
 
----
+## 📚 Vocabulary
 
-## 2. Automated preprocessing pipeline
+The system recognizes the following 25 words:
 
-For each CSV (or DataFrame):
+**Health Conditions & Symptoms:**
+- Bahaar (Outside)
+- Bhukh/Bhookh (Hunger)
+- Bukhar (Fever)
+- Chah (Tea)
+- Chakkar (Dizziness)
+- Dard (Pain)
+- Dhadkan/Dadkan (Heartbeat)
+- Ghabrahat (Anxiety)
+- Gharde (Family members)
+- Jukham (Cold)
+- Kabz (Constipation)
+- Kamjori/Kamjoori (Weakness)
+- Khangh (Cough)
+- Khoon (Blood)
+- Neend (Sleep)
+- Piyaas (Thirst)
+- Saah (Breath)
+- Sardard (Headache)
+- Takleef/Peed (Trouble/Pain)
+- Ulti (Vomit)
+- Dawai (Medicine)
+- Doctor (Doctor)
+- Hospital (Hospital)
+- Paani/Panni (Water)
+- Peshab (Urine)
 
-1. Read recording.
-2. Trim to first `N=1800` rows (warn if fewer).
-3. In first 100 rows: drop rows where `theta` is NaN or zero.
-4. Take absolute value of numeric columns.
-5. Split into 12 parts:
-   - `reference_1` (part 1) → minimum reference  
-   - `reference_2` (part 2) → maximum reference  
-   - `measurement_1` … `measurement_10` (parts 3–12) → motion segments
-6. Automated preprocessing:
-   - Fill short NaN gaps only (sample-limited).
-   - Smooth (Savitzky–Golay / median / rolling).
-   - Detect outliers using robust MAD thresholds.
-   - Replace outliers with smoothed values.
-   - Return cleaned data + boolean masks (`filled`, `outlier`, `changed`) and per-column counts.
 
----
 
-## 3. Extracted motion features (per segment → summarized)
+## 🔬 Technical Approach
 
-For each of the 10 measurement segments:
+### 1. Data Collection
+- Kinematic data captured from jaw movements
+- Parameters tracked: theta (angle), x, y (position), omega (angular velocity), alpha (angular acceleration)
+- Time-series CSV data with ~30 Hz sampling rate
+- 5-second utterances per word
 
-- `num_peaks` (theta)
-- `range_theta = max(theta) − min(theta)`
-- `x_range`, `y_range`
-- `x_disp = last(x) − first(x)`
-- `y_disp = last(y) − first(y)`
+### 2. Signal Processing Pipeline
 
-Per recording / subject / word: **mean and standard deviation** of each metric across the 10 segments.
+**Preprocessing:**
+- Outlier removal using median ± 3*std clipping
+- Interpolation for missing values
+- Median filtering (kernel=5) for denoising
+- Savitzky-Golay filtering for smooth peak detection
 
----
+**Segmentation:**
+- Peak detection in theta (jaw angle) signal
+- Adaptive thresholding based on signal statistics
+- Energy-based filtering to remove false peaks
+- Minimum distance enforcement between peaks
+- Window extraction (25 frames before, 50 frames after peak)
 
-## 4. Analyses implemented
+**Features:**
+- Multi-dimensional kinematic features (theta, x, y, omega, alpha)
+- Time-series segments aligned to detected peaks
+- Statistical features (mean, std, max, min)
 
-### 4.1 Intersubject variability (within a word)
+### 3. Classification
+- Dynamic Time Warping (DTW) for template matching
+- Euclidean distance in feature space
+- Segment-to-segment comparison
 
-For each word × metric:
-- mean of subject means
-- std of subject means
-- coefficient of variation `cv = std / mean`
 
-Output: DataFrame (words × metrics) and CV heatmap.  
-Interpretation: higher CV → higher subject-to-subject variability.
+## 📝 File Descriptions
 
----
+- **seg(main).py**: Time-aware segmentation with expected utterance intervals
+- **segmentation.py**: Complete robust pipeline with adaptive filtering
+- **compare.py**: DTW-based word similarity comparison using basic DTW distance metric
+- **compare2.py**: Multi-metric comparison system with 9 different distance measures
 
-### 4.2 Word separability
+### seg(main).py - Time-Based Peak Selection Pipeline
 
-- **Per-metric Fisher score** = between-word variance / within-word variance.
-- **Pairwise Mahalanobis distance** between word centroids (using pooled within-class covariance).
+This script implements a time-aware segmentation approach specifically designed for controlled recording sessions where words are spoken at regular intervals (approximately every 5 seconds).
 
-Outputs:
-- `fisher_df` (metric importance)
-- `pairwise_mahalanobis` (word × word distance matrix)
-- `centroids` (word × metric mean vectors)
+**Key Features:**
 
-Interpretation: higher Fisher or Mahalanobis → better separability; small distances indicate confusable words.
+**1. Data Preprocessing:**
+- Column name cleaning (strip whitespace)
+- Numeric conversion with error handling
+- Forward interpolation for missing values
+- Median filling for remaining NaN values
+- Outlier clipping using median ± 3*std for all kinematic features
 
----
+**2. Noise Reduction:**
+- Median filtering (kernel=5) on all features (theta, x, y, omega, alpha)
+- Savitzky-Golay smoothing (window=31, polynomial order=3) for peak detection
+- Detrending using rolling median (window=301) to remove slow drift
 
-### 4.3 Within-subject word similarity
-
-For a selected subject:
-- Build per-word feature vectors.
-- Compute pairwise distances and similarity `1 / (1 + dist)`.
-
-Outputs: distance and similarity matrices (heatmaps).  
-Interpretation: lower distance / higher similarity → similar articulation for that subject.
-
----
-
-## 5. Visual outputs
-
-Saved in `Graphs/`:
-- Raw vs cleaned time-series comparisons
-- Cleaned correlation plots
-- Intersubject CV heatmap
-- Fisher score barplot
-- Mahalanobis distance heatmap
-- Within-subject similarity heatmap
-
-Example filenames:
-- `Graphs/Amish_refined_comparison.png`
-- `Graphs/Amish_refined_correlation.png`
-- `Graphs/word_separability_fisher_score.png`
-- `Graphs/word_separability_distance_matrix.png`
-
----
-
-## 6. Example usage
-
-**Gather summaries**
+**3. Expected Time-Based Peak Selection:**
 ```python
-from eda_src.data_loader import gather_motion_summaries
-summaries, errors = gather_motion_summaries(words, names, base_path="Data/recordings")
+expected_times = np.arange(15, time[-1], 5)  # Peaks every 5 seconds starting at 15s
+tolerance = 3.0                               # ±3 second search window
 ```
+- Searches for peaks within ±3 seconds of expected utterance times
+- Uses local peak detection with prominence threshold (0.08 * std)
+- Selects highest peak within each time window
+- Robust to timing variations in manual recordings
 
-**Run analyses**
-```python
-from eda_src.analysis import compute_word_similarity_for_subject, intersubject_variability_table, word_separability_metrics
-from eda_src.visualization import plot_intersubject_variability, plot_word_separability, plot_within_subject_similarity
+**4. Segment Extraction:**
+- Window: 25 frames before peak, 50 frames after peak
+- Z-score normalization per segment (mean=0, std=1)
+- Handles all 5 kinematic features simultaneously
+- Filters out segments shorter than 10 frames
 
-results = produce_reports(words, names, base_path="Data/recordings", subject_for_word_similarity="Bansbir")
-```
+**5. Visualization & EDA:**
+- Signal plot with detected peaks and segment windows
+- Theta distribution histogram with KDE
+- Feature correlation heatmap
+- Normalized segment overlays for theta and omega
+- Color-coded segment windows (orange shading)
 
-**Run preprocessing test**
-```bash
-python Preprocessing/main.py
-```
+**6. Output:**
+- Saves to `.npz` format with normalized segment arrays
+- Compatible with downstream DTW comparison tools
+- Object dtype array to handle variable-length segments
 
----
+### compare2.py - Advanced Multi-Metric Analysis
 
-## 7. Key findings (qualitative)
+This script provides comprehensive word comparison using 9 different signal analysis metrics, offering a more robust similarity assessment than DTW alone:
 
-- Preprocessing robustly fills short gaps and suppresses outliers while tracking all modifications.
-- Some metrics show high intersubject CV → likely sensitive to articulation or sensor placement.
-- Fisher scores identify the most discriminative features (e.g., `range_theta` vs `x_disp`).
-- Small Mahalanobis distances flag potentially confusable word pairs.
+**Metrics Implemented:**
 
----
+1. **DTW Distance** - Dynamic Time Warping on full 5-dimensional feature space (theta, x, y, omega, alpha)
+2. **FFT Power Spectrum Distance** - Compares frequency domain representations using Welch's method
+3. **Dominant Frequency Distance** - Measures difference in primary frequency components
+4. **Spectral Entropy Distance** - Compares information content of frequency distributions
+5. **Wavelet Distance** - Continuous wavelet transform comparison using Ricker wavelets (scales 1-30)
+6. **Trend Distance** - Compares signal slopes using linear regression
+7. **Seasonality Distance** - STL decomposition to compare periodic patterns (period=20 frames)
+8. **Stationarity Distance** - Augmented Dickey-Fuller test statistic comparison
+9. **Volatility Distance** - Short-term variance comparison (rolling window=10 frames)
 
-## 8. Limitations & next steps
+**Features:**
+- Segment-to-segment comparison across all metrics
+- Word-level averaged results for comprehensive similarity assessment
+- Visualization overlays of representative segments
+- Robust error handling for edge cases (short segments, etc.)
 
-- Use time-aware interpolation (Kalman / state-space) for longer gaps.
-- Propagate imputation masks into downstream analysis and down-weight heavily imputed segments.
-- Expand feature set (velocity, acceleration, frequency/time-frequency).
-- Quantify separability via classifiers (LDA, logistic regression, random forest) using top Fisher features.
-- Add PCA projections with centroid ± covariance ellipses.
+**Output:**
+- Detailed metric scores for each segment pair
+- Average metric values per word comparison
+- Overlay plots showing theta signal alignment
 
----
-
-## 9. Notes
-
-- Expected data layout: `Data/recordings/{word}/{subject}.csv`
-- Outputs default to `Graphs/` and `results/`.
-- SciPy required for Savitzky–Golay and peak detection (fallbacks exist).
+This multi-metric approach provides deeper insights into word similarity patterns beyond temporal alignment, capturing frequency characteristics, statistical properties, and signal dynamics.
