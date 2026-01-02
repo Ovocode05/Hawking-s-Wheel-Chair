@@ -22,11 +22,6 @@ This is a concise summary of the exploratory data analysis and preprocessing wor
    - reference_1 (part 1) → treated as "minimum" reference
    - reference_2 (part 2) → treated as "maximum" reference
    - measurement_1 .. measurement_10 (parts 3..12) → motion segments (jaw range of motion)
-6. Automated preprocessing pipeline (one-call):
-   - detect small NaN gaps and fill only short gaps (limit in samples)
-   - smooth series (Savitzky–Golay / median / rolling)
-   - detect outliers using robust MAD-based thresholding and replace them by smoothed values
-   - return cleaned DataFrame + boolean masks: filled / outlier / changed, plus a summary counts per column
 
 ## Extracted motion features (per recording)
 
