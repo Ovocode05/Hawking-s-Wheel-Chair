@@ -99,16 +99,7 @@ Example saved filenames (created by test harness):
 
 ## Limitations and next steps
 
-- Time-aware modeling: current resampling/handling is simplistic; consider Kalman / state-space models for interpolation across longer gaps.
-- Imputation traceability: masks exist but many downstream steps currently ignore whether values were imputed — preserve masks through pipeline and consider filtering features derived from large-imputed regions.
-- Feature set: expand to frequency/time-frequency features or dynamic features (velocity/acceleration) if sensor sampling supports it.
-- Validation: run simple classifiers (e.g., LDA / logistic / random forest) using top Fisher features to quantify word separability statistically.
-- Visualization: add per-word overlay plots of centroids ± covariance ellipses for 2D projections (PCA).
-
-## Contact / notes
-
-- Scripts expect recordings at `Data/recordings/{word}/{subject}.csv`.
-- Plots and intermediate outputs are written to `Graphs/` by default.
-- For repeatability, ensure SciPy is installed (savitzky-golay, peak finding); code has fallbacks when SciPy is missing.
+* Assuming that the dataset is gaussian distributed, we are using Mahalanobis distance and Fisher score to measure the separability between words. 
+*
 
 # End of rough EDA summary

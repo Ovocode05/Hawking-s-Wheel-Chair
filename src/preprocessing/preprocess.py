@@ -2,19 +2,17 @@ import os
 import glob
 import matplotlib.pyplot as plt
 import pandas as pd
-from utils import load_data, trim_data, segment_data, calculate_references, process_utterance_segment
+from utils import load_data, trim_data, segment_data, process_utterance_segment
 
 def main():
     # Setup paths
-    # Note: Script determines paths relative to itself or project root.
-    # Assuming script runs from 'src/preprocessing' or project root.
-    # We will use absolute paths based on user workspace for robustness in this environment, 
-    # or relative if we assume CWD is project root. 
-    # Let's use relative paths assuming CWD is project root "C:\Users\HP\GitMakesMeHappy\Hawking-s-Wheel-Chair"
+    # Determine project root based on script location (src/preprocessing/preprocess.py)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
     
-    input_root = "Data/recordings"
-    output_root = "Normalized_dataset/recordings"
-    graph_root = "Normalized_dataset/Graphs"
+    input_root = os.path.join(project_root, "Data", "recordings")
+    output_root = os.path.join(project_root, "Normalized_dataset", "recordings")
+    graph_root = os.path.join(project_root, "Normalized_dataset", "Graphs")
     
     # Ensure output directories exist
     # Logic: We need to replicate subdirectory structure {word}
@@ -51,17 +49,12 @@ def main():
                 error_count += 1
                 continue
                 
-            # 4. References (Seg 0 & 1)
-            ref_min = segments[0]
-            ref_max = segments[1]
-            ref_angle_min, ref_angle_max = calculate_references(ref_min, ref_max)
-            
             # 5. Process Utterances (Seg 2+)
             utterances = segments[2:]
             processed_segments = []
             
             for seg in utterances:
-                processed_seg = process_utterance_segment(seg, ref_angle_min, ref_angle_max)
+                processed_seg = process_utterance_segment(seg)
                 processed_segments.append(processed_seg)
                 
             # 6. Reassemble
