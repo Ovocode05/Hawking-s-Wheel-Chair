@@ -61,4 +61,35 @@ This module performs pairwise comparisons to evaluate:
 *   **Variability**: `dtw_inter_subject_boxplot.png`
 *   **Distinction**: `dtw_inter_word_avg_heatmap.png`, `js_inter_word_avg_heatmap.png`
 *   **Clustering**: Dendrogram plots (e.g., grouping `Doctor` with phonetically similar words).
-*   **Separability**: `dtw_separability.png` (Comparison of Intra-class vs Inter-class distances).
+
+---
+
+## Phase 3: LSTM Feature Extraction & Classification Feasibility
+**Source**: `src/LSTM/`
+
+### Objective
+Determine if the temporal patterns of jaw motion contain sufficient information to distinguish between different words. Instead of building a final classifier immediately, we first train an LSTM to **extract high-dimensional embeddings** and visualize their separability.
+
+### Methodology
+1.  **Model Architecture**:
+    *   **Input**: Normalized `theta` sequence (Length: 150 frames).
+    *   **Encoder**: 2-layer LSTM (Hidden Size: 64).
+    *   **Feature Vector**: The last hidden state ($h_T$) of the LSTM.
+    *   **Training Head**: Dense layer + Softmax (used for supervision).
+
+2.  **Training**:
+    *   **Loss**: CrossEntropyLoss (to separate classes).
+    *   **Optimizer**: Adam.
+    *   **Goal**: The auxiliary classification task forces the LSTM to learn discriminative features.
+
+3.  **Analysis**:
+    *   Extract embeddings from the trained model.
+    *   **Dimensionality Reduction**: Use t-SNE to project the 64-dimensional embeddings into 2D space.
+    *   **Verification**: If distinct clusters form for each word, it proves that the temporal features are robust enough for classification.
+
+### Results
+*   **Loss Curve**: `src/LSTM/results/loss_curve.png` (Shows convergence).
+*   **Feature Clusters**: `src/LSTM/results/feature_clusters.png` (Visual proof of separability).
+
+> [!NOTE]
+> Detailed results and graphs are generated in `src/LSTM/results/`.

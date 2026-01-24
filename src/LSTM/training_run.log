@@ -1,0 +1,29 @@
+--- Starting Training Pipeline ---
+Scanning dataset at C:\Users\HP\GitMakesMeHappy\Hawking-s-Wheel-Chair\Normalized_dataset\recordings...
+Found classes: ['Bahaar', 'Bhuk', 'Bukhar', 'Chah', 'Chakkar', 'Dard', 'Dawai', 'Dhadkan', 'Doctor', 'Ghabrahat', 'Gharde', 'Hospital', 'Jukham', 'Kabz', 'Kamjori', 'Khangh', 'Khoon', 'Neend', 'Paani', 'Peed', 'Peshab', 'Piyaas', 'Saah', 'Sardard', 'Ulti']
+Total valid files found: 221
+Data Split: 176 Train, 45 Validation
+Using device: cpu
+Epoch [5/100], Train Loss: 3.2002, Val Loss: 3.2698, Val Acc: 8.89%
+Epoch [10/100], Train Loss: 3.1736, Val Loss: 3.3577, Val Acc: 0.00%
+Epoch [15/100], Train Loss: 3.0837, Val Loss: 3.5371, Val Acc: 2.22%
+Epoch [20/100], Train Loss: 2.9837, Val Loss: 3.5952, Val Acc: 0.00%
+Epoch [25/100], Train Loss: 2.7821, Val Loss: 3.8235, Val Acc: 0.00%
+Epoch [30/100], Train Loss: 2.6706, Val Loss: 3.9944, Val Acc: 0.00%
+Epoch [35/100], Train Loss: 2.5108, Val Loss: 4.1475, Val Acc: 0.00%
+Epoch [40/100], Train Loss: 2.3161, Val Loss: 4.4673, Val Acc: 2.22%
+Epoch [45/100], Train Loss: 2.1611, Val Loss: 4.7617, Val Acc: 2.22%
+Epoch [50/100], Train Loss: 2.0436, Val Loss: 4.8340, Val Acc: 0.00%
+Epoch [55/100], Train Loss: 1.9346, Val Loss: 5.0228, Val Acc: 2.22%
+Epoch [60/100], Train Loss: 1.7133, Val Loss: 5.2656, Val Acc: 2.22%
+Epoch [65/100], Train Loss: 1.5852, Val Loss: 5.6656, Val Acc: 2.22%
+Epoch [70/100], Train Loss: 1.5157, Val Loss: 5.7679, Val Acc: 0.00%
+Epoch [75/100], Train Loss: 1.3857, Val Loss: 5.7252, Val Acc: 0.00%
+Epoch [80/100], Train Loss: 1.2646, Val Loss: 6.3236, Val Acc: 0.00%
+Epoch [85/100], Train Loss: 1.1868, Val Loss: 6.5536, Val Acc: 2.22%
+Epoch [90/100], Train Loss: 1.0492, Val Loss: 6.7081, Val Acc: 0.00%
+Epoch [95/100], Train Loss: 0.8923, Val Loss: 7.0554, Val Acc: 0.00%
+Epoch [100/100], Train Loss: 0.8553, Val Loss: 7.1324, Val Acc: 0.00%
+--- Starting Feature Analysis ---
+Running t-SNE...
+Analysis plots saved to C:\Users\HP\GitMakesMeHappy\Hawking-s-Wheel-Chair\src\LSTM\results
